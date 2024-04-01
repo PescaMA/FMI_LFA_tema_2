@@ -1,0 +1,56 @@
+Topic 2 LFA 2024
+
+
+
+
+*please read the entire requirement before starting to implement
+
+
+The following three problems are given, of which you have to solve only two (of your choice):
+
+
+ a)Read a non-deterministic automaton (NFA) from the file and transform it into a deterministic automaton (DFA) that supports exactly the same language.
+ b)Minimize a DFA (create a new DFA with minimal number of states that accepts the same language as the original DFA received as input).
+ c)Read a regular expression and convert it to a Lambda-NFA. For the regular expression you can simplify the input if you want (eg put parentheses everywhere, make it easier to parse).
+
+
+Requirement c) is more advanced and those who choose to do it (together with one of the first two requirements) can end up with a grade of 12. Those who only do requirements a and b can have a maximum of 10.
+
+
+I selected problem c because it is very similar to a problem given at the ACM ICPC in 2012: 20122013-acmicpc-northeastern-european-regional-contest-neerc-12-en.pdf (codeforces.com) (problem D). In that problem you have to convert two expressions to Lambda-NFAs and then see if the two automata have any common supported string.
+
+
+
+
+Useful Links:
+NFA to DFA conversion:
+Conversion of NFA to DFA
+Minimize:
+https://en.wikipedia.org/wiki/DFA_minimization https://www.youtube.com/watch?v=0XaGAkY09Wc&t=781s&ab_channel=NesoAcademy
+
+
+Regular expression:
+Regular expression to ∈-NFA - GeeksforGeeks
+Thompson's construction - Wikipedia
+Problem of the Day - Two Regular Expressions - Programming 22 - Quora
+
+
+
+
+For maximum score:
+-Object Oriented Programming (in C++ or Python or any other language)
+- with classes
+-no global variables
+- good coding style:
+- suggestive variable names (no variables like a, b, c, etc.)
+-"small" functions (long sequences of code will be broken into functions with few instructions and suggestive names)
+-code clear enough not to need too many comments
+
+
+
+
+Recommendation (does not influence your grade)
+-use a more advanced IDE (like Visual Studio or CLion or PyCharm) and learn to use the debugger instead of console displays, it helps to find out why your code crashes more easily
+
+
+Note: for this theme, it is no longer important if the program can only read consecutive states from the file or if it also accepts non-consecutive states (as it was in the previous theme, with states 10, 20, 30, 40, etc.)
