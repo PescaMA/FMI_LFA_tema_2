@@ -66,17 +66,16 @@ class l_NFA : public FA{
     std::pair<int,int> readRegex(const std::string& regExp, int& pos, int& bracketsCount){
         std::pair<int,int> result = {-1,-1};
 
-        while((unsigned int)pos < regExp.size() && regExp[pos] != ')' ){
+        while((unsigned int)pos < regExp.size()){
 
             char ch = regExp[pos];
             pos++;
 
-            while(ch == '('){
+            if(ch == '('){
                 bracketsCount++;
                 std::pair<int,int> nodes = readRegex(regExp,pos,bracketsCount);
                 result.second = nodes.second;
-
-                if(result.first < 0)
+                if(result.first == -1)
                     result.first = nodes.first;
             }
 
@@ -93,21 +92,25 @@ class l_NFA : public FA{
                 if(result.second == -1)
                     throw std::invalid_argument("Starred nothing!");
 
-                if(regExp[pos-1] != ')')
-                    result.first = pos - 1;
-
                 edges[result.second][LAMBDA].insert(result.first);
 
                 if(ch == '*')
                     edges[result.first][LAMBDA].insert(result.second);
-
-                break;
             }
-            edges[pos][ch].insert(pos+1);
-            result.second = pos + 1;
-            if(bracketsCount > 0 && result.first == -1)
-                result.first = pos;
+            if((ch >= 'A' && ch <='Z') ||
+               (ch >= 'a' && ch <='z') ||
+               (ch >= '0' && ch <='9')){
 
+                if(result.second == -1)
+                    result.second = pos;
+
+                if(result.first == -1 || bracketsCount == 0)
+                    result.first = result.second;
+
+                edges[result.second][ch].insert(result.second+1);
+                result.second++;
+
+            }
         }
         return result;
 
@@ -115,10 +118,9 @@ class l_NFA : public FA{
     }
 public:
     l_NFA(const std::string& regExp){
-        startState = 0;
-
         int index = 0, bracketsCount = 0;
         std::pair<int,int> result = readRegex(regExp, index,bracketsCount);
+        startState = result.first;
         finalStates.insert(result.second);
     }
 };
@@ -127,6 +129,7 @@ public:
 int main(){
 std::ifstream fin("input.txt");
 std::ofstream fout("output.txt");
-l_NFA test("a*b");
+l_NFA test("(ac)*");
+
 std::cout << test;
 }
