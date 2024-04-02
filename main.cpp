@@ -52,7 +52,7 @@ public:
             out << el.first << ": ";
             for(auto edge:el.second){
                 for(auto next:edge.second)
-                    out << "-" << edge.first << "->" << next;
+                    out << " -" << edge.first << "-> " << next;
             }
             out << '\n';
         }
@@ -63,30 +63,50 @@ public:
 class l_NFA : public FA{
 
     /// returns start and finish state
-    std::pair<int,int> readRegex(const std::string& regExp, int& pos){
+    std::pair<int,int> readRegex(const std::string& regExp, int& pos, int& bracketsCount){
         std::pair<int,int> result = {-1,-1};
 
-        while((unsigned int
-        )pos < regExp.size() && regExp[pos] != ')' ){
+        while((unsigned int)pos < regExp.size() && regExp[pos] != ')' ){
+
             char ch = regExp[pos];
             pos++;
-            while(ch == '(')
-                std::pair<int,int> nodes = readRegex(regExp,pos);
 
-            if(ch == ')')
+            while(ch == '('){
+                bracketsCount++;
+                std::pair<int,int> nodes = readRegex(regExp,pos,bracketsCount);
+                result.second = nodes.second;
+
+                if(result.first < 0)
+                    result.first = nodes.first;
+            }
+
+
+            if(ch == ')'){
+                bracketsCount--;
+                if(bracketsCount < 0)
+                    throw std::invalid_argument("Wrong parenthesis!");
                 break;
+            }
 
-            if(ch == '*'){
-                if(result.first == -1)
+
+            if(ch == '*' || ch == '+'){
+                if(result.second == -1)
                     throw std::invalid_argument("Starred nothing!");
-                edges[result.first][LAMBDA].insert(result.second);
+
+                if(regExp[pos-1] != ')')
+                    result.first = pos - 1;
+
                 edges[result.second][LAMBDA].insert(result.first);
+
+                if(ch == '*')
+                    edges[result.first][LAMBDA].insert(result.second);
+
                 break;
             }
             edges[pos][ch].insert(pos+1);
-            if(result.first == -1)
-                result.first = pos;
             result.second = pos + 1;
+            if(bracketsCount > 0 && result.first == -1)
+                result.first = pos;
 
         }
         return result;
@@ -95,10 +115,11 @@ class l_NFA : public FA{
     }
 public:
     l_NFA(const std::string& regExp){
-        int index = 0;
         startState = 0;
-        readRegex(regExp, index);
 
+        int index = 0, bracketsCount = 0;
+        std::pair<int,int> result = readRegex(regExp, index,bracketsCount);
+        finalStates.insert(result.second);
     }
 };
 
@@ -106,6 +127,6 @@ public:
 int main(){
 std::ifstream fin("input.txt");
 std::ofstream fout("output.txt");
-l_NFA test("a");
+l_NFA test("a*b");
 std::cout << test;
 }
