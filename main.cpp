@@ -20,6 +20,13 @@ public:
                (ch >= 'a' && ch <='z') ||
                (ch >= '0' && ch <='9');
     }
+    void clear(){
+        finalStates.clear();
+        for(auto edge:edges)
+            for(auto transition:edge.second)
+                transition.second.clear();
+        edges.clear();
+    }
     void read(std::istream& in){/// input data format is present in requirements.txt
         int n,m;
         std::vector<int> states;
@@ -52,7 +59,14 @@ public:
         return in; /// used read so I could write that inside the class.
    }
    friend std::ostream& operator<<(std::ostream& out, FA& myFA){
-       std::vector<int> nodes;
+
+        if(myFA.finalStates.empty())
+            return out << " Empty FA! ";
+
+        std::vector<int> nodes;
+
+        out << "Start node: " << myFA.startState << '\n';
+
         for(auto el:myFA.edges)
             nodes.push_back(el.first);
 
@@ -69,13 +83,14 @@ public:
 
             out << node << ":";
             for(auto edge:sortedEdges)
-                out << " -" << edge.second << "-> " << edge.first;
+                out << " -" << edge.second << "-> " << edge.first << ",";
             out << '\n';
         }
-            /*
-            for(auto edge:el.second){
-                for(auto next:edge.second)
-                    out << " -" << edge.first << "-> " << next;*/
+
+        out << "Final states: ";
+        for(auto node:myFA.finalStates)
+            out << node << ", ";
+        out << '\n';
 
         return out; /// used read so I could write that inside the class.
    }
@@ -92,17 +107,36 @@ class l_NFA : public FA{
         IntPair nodes = {-1,1}; /// first and last states of current expression.
         int bracketsCount = 0;
         regExInfo(const std::string& regExp) : regExp(regExp){}
+        bool inline inWord(){return pos < regExp.size();}
     };
-    bool KleeneStar(regExInfo& info, bool lastElement = true){
+    bool letter(regExInfo& info){
+        if(!acceptedLetter(info.ch))
+             return false;
+
+        if(info.nodes.first == -1)
+            info.nodes.first = info.nodes.second;
+
+        edges[info.nodes.second][LAMBDA].insert(info.nodes.second+1);
+        info.nodes.second++; /// lambda might be useful for future Union.
+
+        edges[info.nodes.second][info.ch].insert(info.nodes.second+1);
+        info.nodes.second++;
+
+        return true;
+    }
+    bool KleeneStar(regExInfo& info, bool onlyOneElement = true){
         if(info.ch != '*' )
             return false;
 
-        if(info.nodes.second == -1)
+        if(info.nodes.first == -1)
             throw std::invalid_argument("Starred nothing!");
+
+        if(info.regExp[info.pos-2] == '*')
+            return false;
 
         IntPair starredNodes;
 
-        if(lastElement) /// if you star only the last element.
+        if(onlyOneElement) /// if not preceded by ) we star only last element.
             starredNodes = {info.nodes.second - 1, info.nodes.second};
         else
             starredNodes = info.nodes;
@@ -112,6 +146,37 @@ class l_NFA : public FA{
         edges[starredNodes.first][LAMBDA].insert(starredNodes.second);
         return true;
     }
+    bool unionOp(regExInfo& info){
+        if(info.ch != '|' && info.ch != '+')
+            return false;
+        if(info.nodes.first == -1)
+            return false; /// union of empty set
+
+        IntPair oldNodes = info.nodes;
+        info.nodes.second++;
+
+        readRegex(info);
+
+        if(info.nodes.first == -1){
+            info.nodes = oldNodes;
+            return false; /// union of empty set
+        }
+        while(info.pos < info.regExp.size() &&
+                info.regExp[info.pos] == '*') {
+            /// clears klenee stars from being processed with ')'
+            edges[oldNodes.first][LAMBDA].insert(info.nodes.second);
+            edges[info.nodes.second][LAMBDA].insert(oldNodes.first);
+            info.pos++;
+        }
+
+        edges[oldNodes.first][LAMBDA].insert(info.nodes.first);
+        edges[info.nodes.first][LAMBDA].insert(oldNodes.first);
+        edges[oldNodes.second][LAMBDA].insert(info.nodes.second);
+        info.nodes.first = oldNodes.first;
+
+        return true;
+    }
+
     bool openBracket(regExInfo& info){
         if(info.ch != '(')
             return false;
@@ -119,6 +184,13 @@ class l_NFA : public FA{
 
         IntPair oldNodes = info.nodes;
         readRegex(info);
+
+        if(info.inWord() && info.regExp[info.pos] == '*'){
+            info.ch = '*';
+            KleeneStar(info,false);
+            info.pos++;
+        }
+
 
         if(oldNodes.first != -1)
             info.nodes.first = oldNodes.first;
@@ -132,30 +204,13 @@ class l_NFA : public FA{
         if(info.bracketsCount < 0)
             throw std::invalid_argument("Wrong parenthesis!");
 
-        if(info.pos < info.regExp.size() && info.regExp[info.pos] == '*'){
-            info.ch = info.regExp[info.pos];
-            KleeneStar(info,false);
-            info.pos++;
-        }
-
         return true;
     }
-    bool letter(regExInfo& info){
-        if(!acceptedLetter(info.ch))
-             return false;
 
-        if(info.nodes.first == -1)
-            info.nodes.first = info.nodes.second;
-
-        edges[info.nodes.second][info.ch].insert(info.nodes.second+1);
-        info.nodes.second++;
-
-        return true;
-    }
     void readRegex(regExInfo& info){
         info.nodes.first = -1;
 
-        while(info.pos < info.regExp.size()){
+        while(info.inWord()){
 
             info.ch = info.regExp[info.pos];
             info.pos++;
@@ -166,9 +221,12 @@ class l_NFA : public FA{
             if(closeBracket(info))
                 break;
 
-            KleeneStar(info); /// since not in parenthesis, star only last element
-
             letter(info);
+
+            KleeneStar(info);
+
+            if(unionOp(info))
+                break;
 
         }
     }
@@ -182,20 +240,41 @@ public:
         } /// ignore all spaces
 
         regExInfo info(preParsedExp);
-
-
-        readRegex(info);
-
-        startState = info.nodes.first;
-        finalStates.insert(info.nodes.second);
+        try{
+            readRegex(info);
+            startState = info.nodes.first;
+            finalStates.insert(info.nodes.second);
+        }
+        catch (const std::invalid_argument& e){
+            std::cerr << "Invalid regular expression: " << e.what() << '\n';
+            clear();
+        }
     }
 };
 
 
 int main(){
-std::ifstream fin("input.txt");
-std::ofstream fout("output.txt");
-l_NFA test("(a* b*)  *");
+    std::ifstream fin("input.txt");
+    std::ofstream fout("output.txt");
 
-std::cout << test;
+    std::vector<std::string> prevTests = {
+"a()b",
+"(a*+b + c)*",
+"a()*",
+"a(*)",
+"((a*)+b+c)*",
+"a()+",
+"a**",
+"(a()*)*",
+"(((a*))*+b+c)*",
+"a(*+b)",
+"a(+)bcd",
+"a(+)b*"};
+
+    for(auto input:prevTests){
+        std::cout << "RUNNING INPUT: " << input << "\n";
+        l_NFA test(input);
+        std::cout << test << "\n\n\n";
+    }
+
 }
