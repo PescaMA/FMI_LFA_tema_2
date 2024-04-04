@@ -103,12 +103,18 @@ class l_NFA : public FA{
         const std::string& regExp; /// the regular expression to be parsed
         char ch; /// the character being processed
         unsigned int pos = 0; /// position in parsing string (of next character)
+        bool inUnion = false;
         IntPair nodes = {-1,1}; /// first and last states of current expression.
         int bracketsCount = 0;
 
         regExInfo(const std::string& regExp) : regExp(regExp){}
         bool inline inWord(){return pos < regExp.size();}
+
     };
+    void inline push(regExInfo& info, const char& ch){
+        edges[info.nodes.second][ch].insert(info.nodes.second+1);
+        info.nodes.second++;
+    }
     bool letter(regExInfo& info){
         if(!acceptedLetter(info.ch))
              return false;
@@ -116,39 +122,51 @@ class l_NFA : public FA{
         if(info.nodes.first == -1)
             info.nodes.first = info.nodes.second;
 
-        edges[info.nodes.second][LAMBDA].insert(info.nodes.second+1);
-        info.nodes.second++;
+        push(info,LAMBDA);
+        push(info,info.ch);
 
-        edges[info.nodes.second][info.ch].insert(info.nodes.second+1);
-        info.nodes.second++;
-
-        edges[info.nodes.second][LAMBDA].insert(info.nodes.second+1);
-        info.nodes.second++;
-
-        /// result looks like this: o -@-> o -ch-> o -@-> o, where o is a new state, @ is Lambda
+        /// result looks like this: o -@-> o -ch-> o, where o is a new state, @ is Lambda
         /// and ch is the edge character. Such a structure is necessary for an easier-to-implement union.
 
         return true;
     }
-    bool KleeneStar(regExInfo& info, bool onlyOneElement = true){
+    bool KStarOne(regExInfo& info){
         if(info.ch != '*' )
             return false;
-
-        if(info.nodes.first == -1)
-            throw std::invalid_argument("Starred nothing! (position: " + std::to_string(info.pos) + ") ");
-
-        if(info.regExp[info.pos-2] == '*') /// starring a star
+        makeKleeneStar(info,{info.nodes.second - 2, info.nodes.second});
+        return true;
+    }
+    bool KStarMany(regExInfo& info){
+        if(!info.inWord() || info.regExp[info.pos] != '*')
             return false;
 
-        IntPair starredNodes = info.nodes;
-
-        if(onlyOneElement)
-            starredNodes = {info.nodes.second - 3, info.nodes.second};
-
-        edges[starredNodes.second - 1][LAMBDA].insert(starredNodes.first + 1);
-        edges[starredNodes.first + 1][LAMBDA].insert(starredNodes.second - 1);
-
+        makeKleeneStar(info,info.nodes);
+        info.pos++;
         return true;
+    }
+    void inline throwNothingStar(regExInfo info){
+        if(info.nodes.first == -1)
+            throw std::invalid_argument("Starred nothing! (position: " + std::to_string(info.pos) + ") ");
+    }
+    bool KStarUnion(regExInfo& info){
+        if(!info.inWord() || info.regExp[info.pos] != '*')
+            return false;
+        throwNothingStar(info);
+
+
+        for(auto node:edges[info.nodes.first][LAMBDA])
+            edges[info.nodes.second][LAMBDA].insert(node);
+        edges[info.nodes.first][LAMBDA].insert(info.nodes.second);
+
+        info.pos++;
+        return true;
+    }
+
+    void makeKleeneStar(regExInfo& info, IntPair starredNodes){
+        throwNothingStar(info);
+
+        edges[starredNodes.second][LAMBDA].insert(starredNodes.first + 1);
+        edges[starredNodes.first + 1][LAMBDA].insert(starredNodes.second);
     }
     bool unionOp(regExInfo& info){
         if(info.ch != '|' && info.ch != '+')
@@ -165,9 +183,13 @@ class l_NFA : public FA{
             info.nodes = oldNodes;
             return false; /// union of empty set
         }
+        info.inUnion = true;
 
         edges[oldNodes.first][LAMBDA].insert(info.nodes.first);
+
+        push(info,LAMBDA);
         edges[oldNodes.second][LAMBDA].insert(info.nodes.second);
+
         info.nodes.first = oldNodes.first;
 
         return true;
@@ -181,11 +203,12 @@ class l_NFA : public FA{
         IntPair oldNodes = info.nodes;
         readRegex(info);
 
-        if(info.inWord() && info.regExp[info.pos] == '*'){
-            info.ch = '*';
-            KleeneStar(info,false);
-            info.pos++;
-        }
+        if(info.inUnion)
+            KStarUnion(info);
+        else
+            KStarMany(info);
+
+        info.inUnion = false;
 
         if(oldNodes.first != -1)
             info.nodes.first = oldNodes.first;
@@ -219,7 +242,7 @@ class l_NFA : public FA{
 
             letter(info);
 
-            KleeneStar(info);
+            KStarOne(info);
 
             if(unionOp(info))
                 break; /// (in case we were inside brackets), we need to end subexpression.
@@ -255,15 +278,17 @@ int main(){
     std::vector<std::string> prevTests = {
 "a(*)", /// should show error message
 "a()*", /// should show error message
-"a(*+b)",
+"a(*+b)", /// should show error message
 "a(())()b", /// same as "ab"
-"a(())()+",
-"a**",
+"a(++b++)", /// same as "ab"
+"a(())()+", /// same as "a"
+"(a**)**",      /// same as "a*"
+"a*+b", /// 1st problem
+"a+b*", /// 2nd problem
+"c+(a+b)*", /// 3rd problem
+"(a+b)*+c", /// 4th problem
 "(a*+b + c)*",
-"(((a*))*+b+c)*",
-"a(+)bc*d",
-"(a+b)*|c|d",
-"c|a*"};
+"a(+)bc*d"};
 
     for(auto input:prevTests){
         std::cout << "RUNNING INPUT: " << input << "\n";
