@@ -1,0 +1,12 @@
+    std::vector<std::string> prevTests = {
+"a(*)", /// should show error message
+"a()*", /// should show error message
+"a(*+b)",
+"a(())()b", /// same as "ab"
+"a(())()+",
+"a**",
+"(a*+b + c)*",
+"(((a*))*+b+c)*",
+"a(+)bc*d",
+"(a+b)*|c|d",
+"c|a*"};
