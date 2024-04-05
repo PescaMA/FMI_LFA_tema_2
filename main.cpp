@@ -102,12 +102,14 @@ class DFA : public FA{
     friend InfoToDFA;
 };
 
-struct InfoToDFA{
+class InfoToDFA{
     DFA result;
     std::map<std::vector<int>,int> rename;
     int currentId = 1;
 public:
-    InfoToDFA(){}
+    InfoToDFA(){result.startState = 1;}
+    const DFA& getResult(){return result;}
+
     inline bool find(const std::vector<int>& nodes){
         return rename.find(nodes) != rename.end();
     }
@@ -116,6 +118,11 @@ public:
             return;
         rename[nodes] = currentId;
         currentId++;
+    }
+    void addFinal(const std::vector<int>& nodes){
+        if(!find(nodes))
+            return;
+        result.finalStates.insert(rename[nodes]);
     }
     void addEdge(const std::vector<int>& nodes,char ch, const std::vector<int>& nextNodes){
         result.edges[ rename[nodes] ] [ch].insert(rename[nextNodes]);
@@ -128,6 +135,9 @@ class NFA : public FA{
         if(info.find(currentState))
             return;
         info.add(currentState);
+        for(auto node:currentState)
+            if(this->finalStates.find(node) != finalStates.end())
+                info.addFinal(currentState);
 
         std::unordered_map<char,std::unordered_set<int> > allNextNodes;
         for(auto state:currentState){
@@ -143,7 +153,7 @@ class NFA : public FA{
             std::vector<int> nextStates;
 
             char ch = edge.first;
-            for(auto node:edge.second){
+            for(auto node:edge.second)
                 nextStates.push_back(node);
 
             getDFA(info,nextStates);
@@ -151,9 +161,6 @@ class NFA : public FA{
 
             info.addEdge(currentState,ch,nextStates);
 
-
-
-            }
         }
 
     }
@@ -162,7 +169,7 @@ public:
         /// o explozie de stari...
         InfoToDFA info;
         getDFA(info,{startState});
-        return info.result;
+        return info.getResult();
     }
 };
 
@@ -364,19 +371,29 @@ void runRegexTests(){
         std::cout << test << "\n\n\n";
     }
 }
+void runNFAtoDFA(){
+    std::ifstream fin("input.txt");
+    std::ofstream fout("output.txt");
 
+    int q;
+    fin >> q;
+
+    for(int i=1;i<=q;i++){
+
+        std::cout << "Running test " << i << ":\n";
+        NFA test;
+        fin >> test;
+        std::cout << "NFA:\n" << test << "\n\n";
+
+        DFA result = test.getDFA();
+
+        std::cout << "DFA:\n";
+        std::cout << result << "\n\n";
+    }
+}
 int main(){
 
     /// runRegexTests();
 
-    std::ifstream fin("input.txt");
-    std::ofstream fout("output.txt");
-
-    NFA test;
-    fin >> test;
-
-
-    DFA result = test.getDFA();
-
-    std::cout << result;
+    runNFAtoDFA();
 }
