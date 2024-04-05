@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <map>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -60,7 +61,7 @@ public:
    }
    friend std::ostream& operator<<(std::ostream& out, FA& myFA){
 
-        if(myFA.finalStates.empty())
+        if(myFA.finalStates.empty() && myFA.edges.empty())
             return out << " Empty FA! ";
 
         std::vector<int> nodes;
@@ -94,6 +95,75 @@ public:
 
         return out; /// used read so I could write that inside the class.
    }
+};
+class InfoToDFA;
+
+class DFA : public FA{
+    friend InfoToDFA;
+};
+
+struct InfoToDFA{
+    DFA result;
+    std::map<std::vector<int>,int> rename;
+    int currentId = 1;
+public:
+    InfoToDFA(){}
+    inline bool find(const std::vector<int>& nodes){
+        return rename.find(nodes) != rename.end();
+    }
+    void add(const std::vector<int>& nodes){
+        if(find(nodes))
+            return;
+        rename[nodes] = currentId;
+        currentId++;
+    }
+    void addEdge(const std::vector<int>& nodes,char ch, const std::vector<int>& nextNodes){
+        result.edges[ rename[nodes] ] [ch].insert(rename[nextNodes]);
+    }
+};
+
+class NFA : public FA{
+
+    void getDFA(InfoToDFA &info,std::vector<int> currentState){
+        if(info.find(currentState))
+            return;
+        info.add(currentState);
+
+        std::unordered_map<char,std::unordered_set<int> > allNextNodes;
+        for(auto state:currentState){
+            for(auto edge:edges[state]){
+                for(auto node:edge.second){
+                    allNextNodes[edge.first].insert(node);
+                }
+            }
+        }
+
+
+        for(auto edge: allNextNodes){
+            std::vector<int> nextStates;
+
+            char ch = edge.first;
+            for(auto node:edge.second){
+                nextStates.push_back(node);
+
+            getDFA(info,nextStates);
+            /// now nextStates will be in rename map
+
+            info.addEdge(currentState,ch,nextStates);
+
+
+
+            }
+        }
+
+    }
+public:
+    DFA getDFA(){
+        /// o explozie de stari...
+        InfoToDFA info;
+        getDFA(info,{startState});
+        return info.result;
+    }
 };
 
 class l_NFA : public FA{
@@ -270,12 +340,8 @@ public:
     }
 };
 
-
-int main(){
-    std::ifstream fin("input.txt");
-    std::ofstream fout("output.txt");
-
-    std::vector<std::string> prevTests = {
+void runRegexTests(){
+        std::vector<std::string> prevTests = {
 "a(*)", /// should show error message
 "a()*", /// should show error message
 "a(*+b)", /// should show error message
@@ -284,7 +350,9 @@ int main(){
 "a(())()+", /// same as "a"
 "(a**)**",      /// same as "a*"
 "a*+b", /// 1st problem
-"a+b*", /// 2nd problem
+"a+b*", /// 2nd
+
+        ///allNextNodes.clear();problem
 "c+(a+b)*", /// 3rd problem
 "(a+b)*+c", /// 4th problem
 "(a*+b + c)*",
@@ -295,5 +363,20 @@ int main(){
         l_NFA test(input);
         std::cout << test << "\n\n\n";
     }
+}
 
+int main(){
+
+    /// runRegexTests();
+
+    std::ifstream fin("input.txt");
+    std::ofstream fout("output.txt");
+
+    NFA test;
+    fin >> test;
+
+
+    DFA result = test.getDFA();
+
+    std::cout << result;
 }
