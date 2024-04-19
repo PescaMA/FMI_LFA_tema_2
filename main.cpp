@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <map>
+#include <set>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -139,7 +140,7 @@ class NFA : public FA{
             if(this->finalStates.find(node) != finalStates.end())
                 info.addFinal(currentState);
 
-        std::unordered_map<char,std::unordered_set<int> > allNextNodes;
+        std::unordered_map<char,std::set<int> > allNextNodes;
         for(auto state:currentState){
             for(auto edge:edges[state]){
                 for(auto node:edge.second){
